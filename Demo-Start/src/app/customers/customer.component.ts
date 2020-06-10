@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, AbstractControl, ValidatorFn } from '@angular/forms';
+import { debounceTime, map } from 'rxjs/operators';
 
 import { Customer } from './customer';
 
@@ -42,6 +43,12 @@ function emailMatch(c: AbstractControl): {[key:string]: boolean}|null {
 export class CustomerComponent implements OnInit {
   customer = new Customer(); // customer property to bind
   customerForm: FormGroup
+  emailMessage: string;
+
+  private validationMessages = { // add the validation messages based on key and value pairs
+    required: 'Please enter your email address',
+    email: 'Please eneter a valid email address'
+  }
 
   constructor(private fb: FormBuilder) { }
 
@@ -58,18 +65,34 @@ export class CustomerComponent implements OnInit {
       rating: [null, ratingRange(1,5)], // between 1 and 5
       notification: ['email']
     });
-    this.customerForm.get('notification').valueChanges.subscribe(
-      value => console.log(value)
+
+
+    this.customerForm.get('notification').valueChanges.subscribe( // dont rely on html to view changes on the input element
+      value => this.setNotification(value)
     ) // need to consider how to react to these changes
 
-    
-
+    const emailControl = this.customerForm.get('emailGroup.email') // reference to email
+    emailControl.valueChanges.pipe(
+      debounceTime(1000)
+    )
+    .subscribe(
+      value => this.setMessage(emailControl)
+    )
 
   }
 
   save() {
     console.log(this.customerForm);
     console.log('Saved: ' + JSON.stringify(this.customerForm.value));
+  }
+
+  setMessage(c:AbstractControl): void {
+    this.emailMessage = '' // clear current message 
+    if((c.touched || c.dirty)&&c.errors){
+      this.emailMessage = Object.keys(c.errors).map( // return array of validation errors as the main key
+        key=> this.validationMessages[key]).join('') // map object key into this and checks 
+      
+    }
   }
 
   setNotification(notifyVia: string): void { // we change the validation of the phone input accordingly 
